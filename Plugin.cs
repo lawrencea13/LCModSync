@@ -5,6 +5,8 @@ using System.Diagnostics.Contracts;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Reflection;
 using System.Security.Policy;
 using System.Text;
@@ -16,6 +18,12 @@ using HarmonyLib;
 using LCModSync.Patches;
 using Mono.Cecil;
 using UnityEngine;
+using UnityEngine.Windows;
+using System.Web;
+using Newtonsoft.Json;
+using System.IO.Compression;
+using System.Runtime.CompilerServices;
+using System.ComponentModel;
 
 namespace LCModSync
 {
@@ -30,7 +38,7 @@ namespace LCModSync
 
         internal static ManualLogSource mls;
 
-        internal static List<PluginInfo> plugins;
+        //internal static List<PluginInfo> plugins;
 
         internal static List<string> modURLs;
         internal static List<string> modNames;
@@ -39,7 +47,10 @@ namespace LCModSync
 
         public string ScriptDirectory => Path.Combine(Paths.BepInExRootPath, "scripts");
         private GameObject scriptManager;
+        static HttpClient client = new HttpClient();
 
+        private static string zipPath;
+        private static string outputPath;
 
         void Awake()
         {
@@ -54,6 +65,7 @@ namespace LCModSync
             harmony.PatchAll(typeof(GameNetworkManagerPatch));
             harmony.PatchAll(typeof(LobbySlotPatch));
             System.IO.Directory.CreateDirectory(".\\BepInEx\\scripts");
+            System.IO.Directory.CreateDirectory(".\\BepInEx\\downloads");
 
             modURLs = new List<string>();
             modNames = new List<string>();
@@ -61,7 +73,7 @@ namespace LCModSync
             getPlugins();
             mls.LogInfo(String.Join(" ", modURLs));
 
-
+            downloadMods("2018", "LC_API");
 
         }
 
@@ -83,21 +95,141 @@ namespace LCModSync
 
         }
 
-        internal static void downloadMods(string modURI, string modFileName)
+        static string getModURLFromRequest(string inputData)
+        {
+            string attribute = "download_url";
+
+            if (!inputData.Contains(attribute))
+            {
+                return "";
+            }
+            int first = inputData.IndexOf(attribute) + attribute.Length;
+
+            List<Char> termsList = new List<Char>();
+            int foundBreaks = 0;
+
+            for (int i = 0; i < 100; i++)
+            {
+                if (inputData[first + i].ToString() == "\"")
+                {
+                    foundBreaks++;
+                }
+                else
+                {
+                    if (foundBreaks == 2)
+                    {
+                        termsList.Add(inputData[first + i]);
+                    }
+                    if (foundBreaks >= 3)
+                    {
+                        break;
+                    }
+                }
+            }
+
+            string finalStr = "";
+
+            foreach (char i in termsList)
+            {
+                finalStr += i.ToString();
+            }
+
+            return finalStr;
+        }
+
+        internal static void downloadMods(string modCreator = "", string modName = "")
         {
             // we can also test more logic here, a hacker may be able to mod their own thing to inject their own files,
             // but unless they distribute malicious copies of this mod, they can't bypass checks here
             // doesn't bother checking if mods exist yet
 
+
+            //mls.LogInfo("We are trying to get the info, I swear");
+
+            // dude I tried parsing this into json like 20 different ways
+            // I give up, time to get the URL from the string ffs
+            string requestBuilder = $"{modCreator}/{modName}/";
+            string modData = getModInfoFromStore(requestBuilder);
+
+
+            //mls.LogInfo(getModURLFromRequest(modData));
+
+            string finalModURL = getModURLFromRequest(modData);
+
+            Uri uri = new Uri(finalModURL);
+            if (uri.Host != "www.thunderstore.io" ^ uri.Host != "https://thunderstore.io")
+            {
+                mls.LogInfo("Potentially bad link detected, ignoring download");
+                return;
+            }
+
+            mls.LogInfo("It was a thunderstore link so time to download >:)");
+
             using (WebClient wc = new WebClient())
             {
+                wc.DownloadFileCompleted += onDownloadComplete;
                 wc.DownloadFileAsync(
-                    new System.Uri(modURI),
+                    new System.Uri(finalModURL),
                     // name of file, aka where it will go
-                    ".\\Bepinex\\scripts\\" + modFileName
+                    ".\\Bepinex\\downloads\\" + $"{modName}.zip"
                 );
             }
+
+            // now that the mod was downloaded, we need to extract it since it is a zip
+            zipPath = Path.GetFullPath(".\\Bepinex\\downloads\\" + $"{modName}.zip");
+            outputPath = Path.GetFullPath(".\\Bepinex\\scripts\\");
+
+            if (!outputPath.EndsWith(Path.DirectorySeparatorChar.ToString(), StringComparison.Ordinal))
+                outputPath += Path.DirectorySeparatorChar;               
         }
+
+        private static void onDownloadComplete(object sender, AsyncCompletedEventArgs e)
+        {
+            extractCurrentMod();
+        }
+
+        private static void extractCurrentMod()
+        {
+            try
+            {
+                using (ZipArchive archive = ZipFile.OpenRead(zipPath))
+                {
+
+                    foreach (ZipArchiveEntry entry in archive.Entries)
+                    {
+                        if (entry.FullName.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+                        {
+                            //File.Create(outputPath + entry.FullName);
+                            mls.LogInfo(entry.FullName);
+                            // Gets the full path to ensure that relative segments are removed.
+                            //string destinationPath = Path.GetFullPath(Path.Combine(outputPath, entry.FullName));
+
+                            // Ordinal match is safest, case-sensitive volumes can be mounted within volumes that are case-insensitive.
+                            if (outputPath.StartsWith(outputPath, StringComparison.Ordinal))
+                                entry.ExtractToFile(outputPath + entry.Name);
+                            mls.LogInfo("trying to extract buckaroo");
+                        }
+                    }
+
+                }
+            }
+            catch(Exception e)
+            {
+                mls.LogInfo($"Extraction failed: {e.Message}");
+            }
+
+
+
+            try
+            {
+                File.Delete(zipPath);
+            }
+            catch
+            {
+                mls.LogInfo("already gone");
+            }
+        }
+
 
         static internal void storeModInfo(string modURL, string modName)
         {
@@ -152,6 +284,12 @@ namespace LCModSync
         }
 
         private IEnumerator DelayAction(Action action)
+        {
+            yield return null;
+            action();
+        }
+
+        private static IEnumerator DelayActionStatic(Action action)
         {
             yield return null;
             action();
@@ -252,6 +390,27 @@ namespace LCModSync
                         }
                     }
                 }
+            }
+        }
+
+        static string getModInfoFromStore(string packagename)
+        {
+            //client.BaseAddress = new Uri("https://thunderstore.io/api/docs/?format=openapi");
+            client.DefaultRequestHeaders.Accept.Clear();
+            client.DefaultRequestHeaders.Accept.Add(
+                new MediaTypeWithQualityHeaderValue("application/json"));
+
+            string requestBuild = "https://thunderstore.io/api/experimental/package/" + packagename;
+
+            try
+            {
+                var result = client.GetAsync(requestBuild).Result;
+                var json = result.Content.ReadAsStringAsync().Result;
+                return json;
+            }
+            catch
+            {
+                return "exception occurred";
             }
         }
 
