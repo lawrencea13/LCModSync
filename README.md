@@ -3,9 +3,8 @@ a mod that will allow you to sync host mods with client mods in Lethal Company
 
 # Requirements
 1. Bepinex
-2. At the moment, ScriptEngine
-3. Host and client need to at least have this mod installed
-4. Internet :)
+2. Host and client need to at least have this mod installed
+3. Internet :)
 
 # How to implement into your mod
 1. Download and add as a reference
