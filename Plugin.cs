@@ -26,6 +26,11 @@ using System.Runtime.CompilerServices;
 using System.ComponentModel;
 using System.Text.RegularExpressions;
 using Newtonsoft.Json.Linq;
+using Steamworks;
+using System.AddIn.Hosting;
+using System.Security.Permissions;
+using System.Security;
+using LCModSync.MYGUI;
 
 namespace LCModSync
 {
@@ -54,10 +59,14 @@ namespace LCModSync
         private static string zipPath;
         private static string outputPath;
 
+        internal string currentModName;
+        internal string currentModCreator;
+
+
         void Awake()
         {
             this.gameObject.hideFlags = UnityEngine.HideFlags.HideAndDontSave;
-            if(Instance == null)
+            if (Instance == null)
             {
                 Instance = this;
             }
@@ -75,7 +84,9 @@ namespace LCModSync
             getPlugins();
             mls.LogInfo(String.Join(" ", modCreators));
 
-            downloadMods("2018", "LC_API");
+            
+
+
 
 
         }
@@ -155,19 +166,22 @@ namespace LCModSync
             return Regex.Replace(str, "[^a-zA-Z0-9_.-]+", string.Empty, RegexOptions.Compiled);
         }
 
-        internal static void downloadMods(string modCreator = "", string modName = "")
+        internal static void promptDownloadMod(string modCreator = "", string modName = "")
         {
             // we can also test more logic here, a hacker may be able to mod their own thing to inject their own files,
             // but unless they distribute malicious copies of this mod, they can't bypass checks here
             // doesn't bother checking if mods exist yet
 
 
-            //mls.LogInfo("We are trying to get the info, I swear");
+            mls.LogInfo("We are trying to get the info, I swear");
 
             // dude I tried parsing this into json like 20 different ways
             // I give up, time to get the URL from the string ffs
             modCreator = RemoveSpecialCharacters(modCreator);
             modName = RemoveSpecialCharacters(modName);
+
+            Instance.currentModCreator = modCreator;
+            Instance.currentModName = modName;
 
             mls.LogInfo($"Stripped modname: {modName}");
 
@@ -175,7 +189,7 @@ namespace LCModSync
             // make GUI here //
             // "do you want to download {modname} by {modcreator}
             // if no, return;
-            
+
             string requestBuilder = $"{modCreator}/{modName}/";
             string modData = getModInfoFromStore(requestBuilder);
 
@@ -196,13 +210,27 @@ namespace LCModSync
                 return;
             }
 
-            
+            // prompt via GUI
+            var gameObject = new UnityEngine.GameObject("DownloadPrompt");
+            UnityEngine.Object.DontDestroyOnLoad(gameObject);
+            gameObject.hideFlags = HideFlags.HideAndDontSave;
+            gameObject.AddComponent<ConfirmDownloadGUI>();
+            var myGUI = (ConfirmDownloadGUI)gameObject.GetComponent("DownloadPrompt");
 
+
+            // if prompt good
+            downloadFromURLAfterConfirmation(finalModURL, modName);
+
+
+        }
+
+        internal static void downloadFromURLAfterConfirmation(string modURL, string modName)
+        {
             using (WebClient wc = new WebClient())
             {
                 wc.DownloadFileCompleted += onDownloadComplete;
                 wc.DownloadFileAsync(
-                    new System.Uri(finalModURL),
+                    new System.Uri(modURL),
                     // name of file, aka where it will go
                     ".\\Bepinex\\downloads\\" + $"{modName}.zip"
                 );
@@ -213,8 +241,8 @@ namespace LCModSync
             outputPath = Path.GetFullPath(".\\Bepinex\\scripts\\");
 
             if (!outputPath.EndsWith(Path.DirectorySeparatorChar.ToString(), StringComparison.Ordinal))
-                outputPath += Path.DirectorySeparatorChar;   
-            
+                outputPath += Path.DirectorySeparatorChar;
+
         }
 
         private static void onDownloadComplete(object sender, AsyncCompletedEventArgs e)
@@ -247,7 +275,7 @@ namespace LCModSync
 
                 }
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 mls.LogInfo($"Extraction failed: {e.Message}");
             }
@@ -265,7 +293,6 @@ namespace LCModSync
 
             Instance.ReloadPlugins();
         }
-
 
         static internal void storeModInfo(string modURL, string modName)
         {
@@ -289,15 +316,15 @@ namespace LCModSync
 
         }
 
-        public void getModURLandName(string modCreator, string modname)
+        public void getModURLandName(string modCreator, string modName)
         {
             /* After sending a message to a mod to ask for their information, they should be calling this method
              * Upon calling this method, they should include a string for the URL of the mod, and a string for the name formatted as name.dll
              * nonstatic, can be called from external area
              */
 
-            mls.LogInfo($"We have received {modname}");
-            storeModInfo(modCreator, modname);
+            mls.LogInfo($"We have received {modName}");
+            storeModInfo(modCreator, modName);
         }
 
         private IEnumerable<Type> GetTypesSafe(Assembly ass)
@@ -372,6 +399,11 @@ namespace LCModSync
 
             using (var dll = AssemblyDefinition.ReadAssembly(path, new ReaderParameters { AssemblyResolver = defaultResolver }))
             {
+                
+                //foreach(var module in dll.CustomAttributes)
+                //{
+                //    mls.LogInfo($"Modules: {module.Properties}");
+                //}
                 //dll.Name.Name = $"{dll.Name.Name}-{DateTime.Now.Ticks}";
 
                 using (var ms = new MemoryStream())
@@ -381,10 +413,10 @@ namespace LCModSync
 
                     foreach (Type type in GetTypesSafe(ass))
                     {
-                        
+
                         try
                         {
-                            
+
                             if (!typeof(BaseUnityPlugin).IsAssignableFrom(type)) continue;
 
                             var metadata = MetadataHelper.GetMetadata(type);
@@ -395,7 +427,7 @@ namespace LCModSync
 
                             var typeDefinition = dll.MainModule.Types.First(x => x.FullName == type.FullName);
                             var pluginInfo = Chainloader.ToPluginInfo(typeDefinition);
-                        
+
 
                             StartCoroutine(DelayAction(() =>
                             {
@@ -451,4 +483,5 @@ namespace LCModSync
         }
 
     }
+
 }
