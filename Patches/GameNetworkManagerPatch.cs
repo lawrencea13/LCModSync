@@ -23,7 +23,7 @@ namespace LCModSync.Patches
             ModSyncPlugin.mls.LogInfo("Lobby created");
             lobby.SetData("TestData", "BOOP");
             lobby.SetData("modNames", String.Join(" ", ModSyncPlugin.modNames));
-            lobby.SetData("modURLs", String.Join(" ", ModSyncPlugin.modURLs));
+            lobby.SetData("modCreators", String.Join(" ", ModSyncPlugin.modCreators));
         }
     }
 }

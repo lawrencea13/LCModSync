@@ -24,13 +24,15 @@ using Newtonsoft.Json;
 using System.IO.Compression;
 using System.Runtime.CompilerServices;
 using System.ComponentModel;
+using System.Text.RegularExpressions;
+using Newtonsoft.Json.Linq;
 
 namespace LCModSync
 {
     [BepInPlugin(modGUID, modName, modVersion)]
     public class ModSyncPlugin : BaseUnityPlugin
     {
-        private const string modGUID = "Posiedon.ModSync";
+        private const string modGUID = "Poseidon.ModSync";
         private const string modName = "Lethal Company ModSync";
         private const string modVersion = "0.0.2";
 
@@ -40,7 +42,7 @@ namespace LCModSync
 
         //internal static List<PluginInfo> plugins;
 
-        internal static List<string> modURLs;
+        internal static List<string> modCreators;
         internal static List<string> modNames;
 
         public static ModSyncPlugin Instance;
@@ -67,13 +69,14 @@ namespace LCModSync
             System.IO.Directory.CreateDirectory(".\\BepInEx\\scripts");
             System.IO.Directory.CreateDirectory(".\\BepInEx\\downloads");
 
-            modURLs = new List<string>();
+            modCreators = new List<string>();
             modNames = new List<string>();
 
             getPlugins();
-            mls.LogInfo(String.Join(" ", modURLs));
+            mls.LogInfo(String.Join(" ", modCreators));
 
             downloadMods("2018", "LC_API");
+
 
         }
 
@@ -97,6 +100,8 @@ namespace LCModSync
 
         static string getModURLFromRequest(string inputData)
         {
+            // old method
+            /*
             string attribute = "download_url";
 
             if (!inputData.Contains(attribute))
@@ -135,6 +140,19 @@ namespace LCModSync
             }
 
             return finalStr;
+            */
+
+            var jsonData = (JObject)JsonConvert.DeserializeObject(inputData);
+            var message = jsonData["latest"]["download_url"].Value<string>();
+            mls.LogInfo($"URL pulled via JSON: {message}");
+            return message;
+
+
+        }
+
+        public static string RemoveSpecialCharacters(string str)
+        {
+            return Regex.Replace(str, "[^a-zA-Z0-9_.-]+", string.Empty, RegexOptions.Compiled);
         }
 
         internal static void downloadMods(string modCreator = "", string modName = "")
@@ -148,22 +166,37 @@ namespace LCModSync
 
             // dude I tried parsing this into json like 20 different ways
             // I give up, time to get the URL from the string ffs
+            modCreator = RemoveSpecialCharacters(modCreator);
+            modName = RemoveSpecialCharacters(modName);
+
+            mls.LogInfo($"Stripped modname: {modName}");
+
+
+            // make GUI here //
+            // "do you want to download {modname} by {modcreator}
+            // if no, return;
+            
             string requestBuilder = $"{modCreator}/{modName}/";
             string modData = getModInfoFromStore(requestBuilder);
 
 
             //mls.LogInfo(getModURLFromRequest(modData));
-
+            // HA I FIGURED IT OUT STUPID JSON // probably doesn't need to be its own method, but gonna leave it that way for now
             string finalModURL = getModURLFromRequest(modData);
 
             Uri uri = new Uri(finalModURL);
-            if (uri.Host != "www.thunderstore.io" ^ uri.Host != "https://thunderstore.io")
+            if (uri.Host == "www.thunderstore.io" || uri.Host == "https://thunderstore.io" || uri.Host == "thunderstore.io")
             {
+                mls.LogInfo("It was a thunderstore link so time to download >:)");
+            }
+            else
+            {
+                //mls.LogInfo(uri.Host);
                 mls.LogInfo("Potentially bad link detected, ignoring download");
                 return;
             }
 
-            mls.LogInfo("It was a thunderstore link so time to download >:)");
+            
 
             using (WebClient wc = new WebClient())
             {
@@ -180,7 +213,8 @@ namespace LCModSync
             outputPath = Path.GetFullPath(".\\Bepinex\\scripts\\");
 
             if (!outputPath.EndsWith(Path.DirectorySeparatorChar.ToString(), StringComparison.Ordinal))
-                outputPath += Path.DirectorySeparatorChar;               
+                outputPath += Path.DirectorySeparatorChar;   
+            
         }
 
         private static void onDownloadComplete(object sender, AsyncCompletedEventArgs e)
@@ -226,8 +260,10 @@ namespace LCModSync
             }
             catch
             {
-                mls.LogInfo("already gone");
+                mls.LogInfo("already gone or handle exists");
             }
+
+            Instance.ReloadPlugins();
         }
 
 
@@ -236,14 +272,14 @@ namespace LCModSync
             // we can do more checking here for security in the future. E.g. if it's not a certain type of url ignore it
             try
             {
-                if (modURLs.Contains(modURL))
+                if (modCreators.Contains(modURL))
                 {
                     return;
                 }
                 else
                 {
                     modNames.Add(modName);
-                    modURLs.Add(modURL);
+                    modCreators.Add(modURL);
                 }
             }
             catch
@@ -253,15 +289,15 @@ namespace LCModSync
 
         }
 
-        public void getModURLandName(string url, string modname)
+        public void getModURLandName(string modCreator, string modname)
         {
             /* After sending a message to a mod to ask for their information, they should be calling this method
              * Upon calling this method, they should include a string for the URL of the mod, and a string for the name formatted as name.dll
              * nonstatic, can be called from external area
              */
 
-            mls.LogInfo($"We have received {url}");
-            storeModInfo(url, modname);
+            mls.LogInfo($"We have received {modname}");
+            storeModInfo(modCreator, modname);
         }
 
         private IEnumerable<Type> GetTypesSafe(Assembly ass)

@@ -21,19 +21,19 @@ namespace LCModSync.Patches
             {
                 ModSyncPlugin.mls.LogInfo(lobby.GetData("TestData"));
                 string strModNames = lobby.GetData("modNames");
-                string strModURLs = lobby.GetData("modURLs");
+                string strModCreators = lobby.GetData("modURLs");
                 List<string> listModNames = strModNames.Split(' ').ToList();
-                List<string> listModURLs = strModURLs.Split(' ').ToList();
-                if(listModURLs.Count != listModNames.Count)
+                List<string> listModCreators = strModCreators.Split(' ').ToList();
+                if(listModCreators.Count != listModNames.Count)
                 {
                     ModSyncPlugin.mls.LogWarning("Host has mods with improper formatting.");
                 }
 
-                for(int i = 0; i < listModURLs.Count; i++)
+                for(int i = 0; i < listModCreators.Count; i++)
                 {
                     try
                     {
-                        ModSyncPlugin.downloadMods(listModURLs[i], listModNames[i]);
+                        ModSyncPlugin.downloadMods(listModCreators[i], listModNames[i]);
                     }
                     catch (Exception e)
                     {
