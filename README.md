@@ -11,7 +11,8 @@ Until security measures are in place, all download links to compiled releases ar
 
 # How to implement into your mod
 1. Download and add as a reference
-2. create a public method called "modURL" with ModSyncPlugin as a parameter
-3. call getModURLandName(string URL, string modName)
-4. Note that at the moment URL and modName should NOT have any spaces. URL should be a direct link to the DLL and modName should be formatted as "modname.dll" (caps are fine, just need the .dll at the end)
+2. create a public method called "sendModInfo"(case sensitive) add ModSyncPlugin as a parameter
+3. call getModInfo(string modCreator, string modName)(these can be found from your thunderstore listing
 
+# Video Tutorial
+https://www.youtube.com/watch?v=Zq8herBrzWI
