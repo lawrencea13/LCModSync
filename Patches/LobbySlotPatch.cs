@@ -14,14 +14,14 @@ namespace LCModSync.Patches
     {
         [HarmonyPatch(nameof(LobbySlot.OnLobbyDataRefresh))]
         [HarmonyPrefix]
-        private static void patchLobbyJoin(ref Lobby lobby)
+        private static bool patchLobbyJoin(ref Lobby lobby)
         {
             // boop checks if mod implemented tbh
             if (lobby.GetData("TestData") == "BOOP")
             {
                 ModSyncPlugin.mls.LogInfo(lobby.GetData("TestData"));
                 string strModNames = lobby.GetData("modNames");
-                string strModCreators = lobby.GetData("modURLs");
+                string strModCreators = lobby.GetData("modCreators");
                 List<string> listModNames = strModNames.Split(' ').ToList();
                 List<string> listModCreators = strModCreators.Split(' ').ToList();
                 if(listModCreators.Count != listModNames.Count)
@@ -33,7 +33,9 @@ namespace LCModSync.Patches
                 {
                     try
                     {
-                        ModSyncPlugin.downloadMods(listModCreators[i], listModNames[i]);
+                        ModSyncPlugin.Instance.currentModDownloaded = false;
+                        ModSyncPlugin.Instance.waitForModDownloads();
+                        ModSyncPlugin.promptDownloadMod(listModCreators[i], listModNames[i]);
                     }
                     catch (Exception e)
                     {
@@ -48,6 +50,8 @@ namespace LCModSync.Patches
             {
                 ModSyncPlugin.mls.LogInfo("DO NOT BOOP");
             }
+
+            return false;
 
         }
     }

@@ -39,7 +39,7 @@ namespace LCModSync
     {
         private const string modGUID = "Poseidon.ModSync";
         private const string modName = "Lethal Company ModSync";
-        private const string modVersion = "0.0.2";
+        private const string modVersion = "0.0.4";
 
         private readonly Harmony harmony = new Harmony(modGUID);
 
@@ -61,6 +61,8 @@ namespace LCModSync
 
         internal string currentModName;
         internal string currentModCreator;
+
+        internal bool currentModDownloaded = false;
 
 
         void Awake()
@@ -84,7 +86,6 @@ namespace LCModSync
             getPlugins();
             mls.LogInfo(String.Join(" ", modCreators));
 
-            
 
 
 
@@ -98,7 +99,7 @@ namespace LCModSync
             {
                 try
                 {
-                    plugin.Value.Instance.BroadcastMessage("modURL", Instance, UnityEngine.SendMessageOptions.DontRequireReceiver);
+                    plugin.Value.Instance.BroadcastMessage("sendModInfo", Instance, UnityEngine.SendMessageOptions.DontRequireReceiver);
                 }
                 catch (Exception e)
                 {
@@ -219,9 +220,18 @@ namespace LCModSync
 
 
             // if prompt good
-            downloadFromURLAfterConfirmation(finalModURL, modName);
+            //downloadFromURLAfterConfirmation(finalModURL, modName);
 
 
+        }
+
+        internal IEnumerator waitForModDownloads()
+        {
+            mls.LogInfo($"Started waiting for mod downloads at: {Time.time}");
+            yield return new WaitForSeconds(10f);
+            mls.LogInfo("Waitin for mod download");
+            mls.LogInfo($"Finished waiting for mod downloads at: {Time.time}");
+            currentModDownloaded = false;
         }
 
         internal static void downloadFromURLAfterConfirmation(string modURL, string modName)
@@ -291,7 +301,7 @@ namespace LCModSync
                 mls.LogInfo("already gone or handle exists");
             }
 
-            Instance.ReloadPlugins();
+            Instance.currentModDownloaded = true;
         }
 
         static internal void storeModInfo(string modURL, string modName)
@@ -316,7 +326,7 @@ namespace LCModSync
 
         }
 
-        public void getModURLandName(string modCreator, string modName)
+        public void getModInfo(string modCreator, string modName)
         {
             /* After sending a message to a mod to ask for their information, they should be calling this method
              * Upon calling this method, they should include a string for the URL of the mod, and a string for the name formatted as name.dll
