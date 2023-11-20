@@ -32,15 +32,16 @@ using System.Security.Permissions;
 using System.Security;
 using LCModSync.MYGUI;
 using Unity.Profiling;
+using Steamworks.Data;
 
 namespace LCModSync
 {
     [BepInPlugin(modGUID, modName, modVersion)]
-    public class ModSyncPlugin : BaseUnityPlugin
+    public class ModSyncPlugin : BaseUnityPlugins
     {
         private const string modGUID = "Poseidon.ModSync";
         private const string modName = "Lethal Company ModSync";
-        private const string modVersion = "0.0.4";
+        private const string modVersion = "0.1.0";
 
         private readonly Harmony harmony = new Harmony(modGUID);
 
@@ -64,11 +65,18 @@ namespace LCModSync
         internal string currentModCreator;
 
         internal bool currentModDownloaded = false;
-        internal bool allModsDownloaded = false;
-        internal int amountOfModsToDownload;
-        internal int amountOfModsDownloaded = 0;
+
+        internal static List<string> currentModCreators;
+        internal static List<string> currentModNames;
 
         internal string currentModURL;
+        internal int downloadProgress = 0;
+
+        public EventHandler eventDownloadComplete;
+        internal ConfirmDownloadGUI myGUI;
+        internal GameObject currentGUIObject;
+
+        internal bool guiMenuOpen = false;
 
 
         void Awake()
@@ -89,16 +97,12 @@ namespace LCModSync
             modCreators = new List<string>();
             modNames = new List<string>();
 
-            getPlugins();
-            mls.LogInfo(String.Join(" ", modCreators));
-
-
-
-
+            
+            //mls.LogInfo(String.Join(" ", modCreators));
 
         }
 
-        static void getPlugins()
+        internal static void getPlugins()
         {
             mls.LogInfo("Checking for plugins");
             foreach (var plugin in Chainloader.PluginInfos)
@@ -115,6 +119,8 @@ namespace LCModSync
             }
 
         }
+
+
 
         static string getModURLFromRequest(string inputData)
         {
@@ -178,73 +184,72 @@ namespace LCModSync
             // we can also test more logic here, a hacker may be able to mod their own thing to inject their own files,
             // but unless they distribute malicious copies of this mod, they can't bypass checks here
             // doesn't bother checking if mods exist yet
+            currentModNames = modName;
+            currentModCreators = modCreator;
 
-            string requestBuilder;
-            string modData;
-            var gameObject = new UnityEngine.GameObject("DownloadPrompt");
-            UnityEngine.Object.DontDestroyOnLoad(gameObject);
-            gameObject.hideFlags = HideFlags.HideAndDontSave;
-            gameObject.AddComponent<ConfirmDownloadGUI>();
-            ConfirmDownloadGUI myGUI = (ConfirmDownloadGUI)gameObject.GetComponent("DownloadPrompt");
-            amountOfModsToDownload = modCreator.Count - 1;
 
             for (int i = 0; i < modCreator.Count; i++)
             {
                 modCreator[i] = RemoveSpecialCharacters(modCreator[i]);
                 modName[i] = RemoveSpecialCharacters(modName[i]);
-                Instance.currentModCreator = modCreator[i];
-                Instance.currentModName = modName[i];
-                requestBuilder = $"{modCreator}/{modName}/";
-                modData = getModInfoFromStore(requestBuilder);
-                currentModURL = getModURLFromRequest(modData);
-                if (currentModURL != string.Empty)
-                {
-                    Uri uri = new Uri(currentModURL);
-                    if (uri.Host == "www.thunderstore.io" || uri.Host == "https://thunderstore.io" || uri.Host == "thunderstore.io")
-                    {
-                        mls.LogInfo("It was a thunderstore link so time to download >:)");
-                        // don't need to do anything
-                    }
-                    else
-                    {
-                        mls.LogInfo("ignoring and moving to next mod, bad URL");
-                        continue;
-                    }
-                }
-                myGUI.isMenuOpen = true;
-
-                while (!currentModDownloaded)
-                {
-                    StartCoroutine(waitForModDownloads(() => { }, 0.1f));
-                }
-                StartCoroutine(waitForModDownloads(() => { mls.LogInfo("Mod download complete, moving to the next"); }, 0.1f));
-                currentModDownloaded = false;
-                amountOfModsDownloaded += 1;
-                if(amountOfModsDownloaded >= amountOfModsToDownload)
-                {
-                    allModsDownloaded = true;
-                }
+                // remove all special chars
             }
-
+            mls.LogInfo("About to call downloadindividualmods");
+            downloadIndividualMod(modCreator[0], modName[0]);
            
         }
 
-        internal void staticBridgeCoroutineStart(Action action)
+        internal void downloadIndividualMod(string firstModCreator, string firstModName)
         {
-            StartCoroutine(waitForModDownloads(action, 5f));
-        }
+            if(myGUI == null)
+            {
+                currentGUIObject = new UnityEngine.GameObject("DownloadPrompt");
+                UnityEngine.Object.DontDestroyOnLoad(currentGUIObject);
+                currentGUIObject.hideFlags = HideFlags.HideAndDontSave;
+                currentGUIObject.AddComponent<ConfirmDownloadGUI>();
+                myGUI = (ConfirmDownloadGUI)currentGUIObject.GetComponent("DownloadPrompt");
+            }
+            else
+            {
+                Destroy(currentGUIObject.gameObject);
+                currentGUIObject = null;
 
-        internal void staticBridgeWaitForModDownloads(float delay)
-        {
-            StartCoroutine(waitForModDownloads(() => { }, delay));
-        }
+                currentGUIObject = new UnityEngine.GameObject("DownloadPrompt");
+                UnityEngine.Object.DontDestroyOnLoad(currentGUIObject);
+                currentGUIObject.hideFlags = HideFlags.HideAndDontSave;
+                currentGUIObject.AddComponent<ConfirmDownloadGUI>();
+                myGUI = (ConfirmDownloadGUI)currentGUIObject.GetComponent("DownloadPrompt");
 
-        internal IEnumerator waitForModDownloads(Action action, float delay)
-        {
-            //mls.LogInfo($"Started waiting for mod downloads at: {Time.time}");
-            yield return new WaitForSeconds(delay);
-            //mls.LogInfo($"Finished waiting for mod downloads at: {Time.time}");
-            action();
+            }
+            mls.LogInfo("called downloadindividual mods");
+            string requestBuilder;
+            string modData;
+            Instance.currentModCreator = firstModCreator;
+            Instance.currentModName = firstModName;
+            requestBuilder = $"{firstModCreator}/{firstModName}/";
+            modData = getModInfoFromStore(requestBuilder);
+            currentModURL = getModURLFromRequest(modData);
+            if (currentModURL != string.Empty)
+            {
+                Uri uri = new Uri(currentModURL);
+                if (uri.Host == "www.thunderstore.io" || uri.Host == "https://thunderstore.io" || uri.Host == "thunderstore.io")
+                {
+                    mls.LogInfo("It was a thunderstore link so time to download >:)");
+                    mls.LogInfo("about to open up that sexc gui");
+                    // this gets stuck, I'm gonna leave it here but I'm also gonna do a stupid thing where I reference a bool here
+                    myGUI.isMenuOpen = true;
+                    guiMenuOpen = true;
+
+
+                }
+                else
+                {
+                    mls.LogInfo("ignoring and moving to next mod, bad URL");
+                    myGUI.isMenuOpen = false;
+                    guiMenuOpen = false;
+                }
+            }
+            
         }
 
         internal static void downloadFromURLAfterConfirmation(string modURL, string modName)
@@ -252,6 +257,7 @@ namespace LCModSync
             using (WebClient wc = new WebClient())
             {
                 wc.DownloadFileCompleted += onDownloadComplete;
+                wc.DownloadProgressChanged += onDownloadProgressChange;
                 wc.DownloadFileAsync(
                     new System.Uri(modURL),
                     // name of file, aka where it will go
@@ -268,8 +274,14 @@ namespace LCModSync
 
         }
 
+        private static void onDownloadProgressChange(object sender, DownloadProgressChangedEventArgs e)
+        {
+            Instance.downloadProgress = e.ProgressPercentage;
+        }
+
         private static void onDownloadComplete(object sender, AsyncCompletedEventArgs e)
         {
+            Instance.downloadProgress = 0;
             extractCurrentMod();
         }
 
@@ -277,6 +289,8 @@ namespace LCModSync
         {
             try
             {
+                System.IO.Directory.CreateDirectory(".\\BepInEx\\scripts");
+                System.IO.Directory.CreateDirectory(".\\BepInEx\\downloads");
                 using (ZipArchive archive = ZipFile.OpenRead(zipPath))
                 {
 
@@ -301,6 +315,7 @@ namespace LCModSync
             catch (Exception e)
             {
                 mls.LogInfo($"Extraction failed: {e.Message}");
+                mls.LogInfo($"Cleaning up and moving to next mod");
             }
 
 
@@ -314,7 +329,22 @@ namespace LCModSync
                 mls.LogInfo("already gone or handle exists");
             }
 
-            Instance.currentModDownloaded = true;
+            currentModCreators.RemoveAt(0);
+            currentModNames.RemoveAt(0);
+
+            Destroy(Instance.currentGUIObject.gameObject);
+            Instance.currentGUIObject = null;
+
+            mls.LogInfo($"finished downloading mod, about to cleanup to progress. You have {currentModNames.Count} mods left to download");
+
+            if (currentModCreators.Count <= 0)
+            {
+                LobbySlotPatch.finishLoadingIntoLobby();
+            }
+            else
+            {
+                Instance.downloadIndividualMod(currentModCreators[0], currentModNames[0]);
+            }
         }
 
         static internal void storeModInfo(string modURL, string modName)

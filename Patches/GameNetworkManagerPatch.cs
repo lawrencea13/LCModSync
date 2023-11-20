@@ -20,7 +20,8 @@ namespace LCModSync.Patches
         [HarmonyPrefix]
         public static void lobbyCreatedPatch(ref Result result, ref Lobby lobby)
         {
-            ModSyncPlugin.Instance.currentModDownloaded = false;
+            ModSyncPlugin.getPlugins();
+            //ModSyncPlugin.Instance.currentModDownloaded = false;
             //ModSyncPlugin.Instance.StartCoroutine("waitForModDownloads");
             //ModSyncPlugin.promptDownloadMod("2018", "LC_API");
             ModSyncPlugin.mls.LogInfo("Lobby created");

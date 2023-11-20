@@ -94,19 +94,22 @@ namespace LCModSync.MYGUI
         {
             if (menuStyle == null) { intitializeMenu(); }
 
-            if (isMenuOpen)
+            GUI.Box(new Rect(MENUX, MENUY, MENUWIDTH, MENUHEIGHT), "ModSync", menuStyle);
+            GUI.Label(new Rect(CENTERX, MENUY + 100, ITEMWIDTH, 80), $"Would you like to download {ModSyncPlugin.Instance.currentModName} by {ModSyncPlugin.Instance.currentModCreator}?", labelStyle);
+            GUI.Label(new Rect(CENTERX, MENUY + 200, ITEMWIDTH, 80), $"{ModSyncPlugin.Instance.downloadProgress}%", labelStyle);
+            if (GUI.Button(new Rect(MENUX + (0.25f * MENUX) - ((ITEMWIDTH / 1.5f) / 2), MENUY + MENUHEIGHT - 150, ITEMWIDTH / 1.5f, 50), "Confirm Download", confirmButtonStyle))
             {
-                GUI.Box(new Rect(MENUX, MENUY, MENUWIDTH, MENUHEIGHT), "ModSync", menuStyle);
-                GUI.Label(new Rect(CENTERX, MENUY + 100, ITEMWIDTH, 80), $"Would you like to download {ModSyncPlugin.Instance.currentModName} by {ModSyncPlugin.Instance.currentModCreator}?", labelStyle);
-                if(GUI.Button(new Rect(MENUX + (0.25f * MENUX) - ((ITEMWIDTH / 1.5f) / 2), MENUY + MENUHEIGHT - 150, ITEMWIDTH / 1.5f, 50), "Confirm Download", confirmButtonStyle))
-                {
-                    ModSyncPlugin.downloadFromURLAfterConfirmation(ModSyncPlugin.Instance.currentModURL, ModSyncPlugin.Instance.currentModName);
-                }
+                ModSyncPlugin.downloadFromURLAfterConfirmation(ModSyncPlugin.Instance.currentModURL, ModSyncPlugin.Instance.currentModName);
+            }
 
-                if(GUI.Button(new Rect(MENUX + (0.75f * MENUX) - ((ITEMWIDTH / 1.5f) / 2), MENUY + MENUHEIGHT - 150, ITEMWIDTH / 1.5f, 50), "Decline Download", declineButtonStyle))
-                {
-                    ModSyncPlugin.Instance.currentModDownloaded = true;
-                }
+            if (GUI.Button(new Rect(MENUX + (0.75f * MENUX) - ((ITEMWIDTH / 1.5f) / 2), MENUY + MENUHEIGHT - 150, ITEMWIDTH / 1.5f, 50), "Decline Download", declineButtonStyle))
+            {
+                ModSyncPlugin.Instance.currentModDownloaded = true;
+            }
+
+            if (ModSyncPlugin.Instance.guiMenuOpen)
+            {
+
             }
         }
     }
