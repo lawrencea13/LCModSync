@@ -31,6 +31,7 @@ using System.AddIn.Hosting;
 using System.Security.Permissions;
 using System.Security;
 using LCModSync.MYGUI;
+using Unity.Profiling;
 
 namespace LCModSync
 {
@@ -63,6 +64,11 @@ namespace LCModSync
         internal string currentModCreator;
 
         internal bool currentModDownloaded = false;
+        internal bool allModsDownloaded = false;
+        internal int amountOfModsToDownload;
+        internal int amountOfModsDownloaded = 0;
+
+        internal string currentModURL;
 
 
         void Awake()
@@ -167,71 +173,78 @@ namespace LCModSync
             return Regex.Replace(str, "[^a-zA-Z0-9_.-]+", string.Empty, RegexOptions.Compiled);
         }
 
-        internal static void promptDownloadMod(string modCreator = "", string modName = "")
+        internal void promptDownloadMods(List<string> modCreator, List<string> modName)
         {
             // we can also test more logic here, a hacker may be able to mod their own thing to inject their own files,
             // but unless they distribute malicious copies of this mod, they can't bypass checks here
             // doesn't bother checking if mods exist yet
 
-
-            mls.LogInfo("We are trying to get the info, I swear");
-
-            // dude I tried parsing this into json like 20 different ways
-            // I give up, time to get the URL from the string ffs
-            modCreator = RemoveSpecialCharacters(modCreator);
-            modName = RemoveSpecialCharacters(modName);
-
-            Instance.currentModCreator = modCreator;
-            Instance.currentModName = modName;
-
-            mls.LogInfo($"Stripped modname: {modName}");
-
-
-            // make GUI here //
-            // "do you want to download {modname} by {modcreator}
-            // if no, return;
-
-            string requestBuilder = $"{modCreator}/{modName}/";
-            string modData = getModInfoFromStore(requestBuilder);
-
-
-            //mls.LogInfo(getModURLFromRequest(modData));
-            // HA I FIGURED IT OUT STUPID JSON // probably doesn't need to be its own method, but gonna leave it that way for now
-            string finalModURL = getModURLFromRequest(modData);
-
-            Uri uri = new Uri(finalModURL);
-            if (uri.Host == "www.thunderstore.io" || uri.Host == "https://thunderstore.io" || uri.Host == "thunderstore.io")
-            {
-                mls.LogInfo("It was a thunderstore link so time to download >:)");
-            }
-            else
-            {
-                //mls.LogInfo(uri.Host);
-                mls.LogInfo("Potentially bad link detected, ignoring download");
-                return;
-            }
-
-            // prompt via GUI
+            string requestBuilder;
+            string modData;
             var gameObject = new UnityEngine.GameObject("DownloadPrompt");
             UnityEngine.Object.DontDestroyOnLoad(gameObject);
             gameObject.hideFlags = HideFlags.HideAndDontSave;
             gameObject.AddComponent<ConfirmDownloadGUI>();
-            var myGUI = (ConfirmDownloadGUI)gameObject.GetComponent("DownloadPrompt");
+            ConfirmDownloadGUI myGUI = (ConfirmDownloadGUI)gameObject.GetComponent("DownloadPrompt");
+            amountOfModsToDownload = modCreator.Count - 1;
 
+            for (int i = 0; i < modCreator.Count; i++)
+            {
+                modCreator[i] = RemoveSpecialCharacters(modCreator[i]);
+                modName[i] = RemoveSpecialCharacters(modName[i]);
+                Instance.currentModCreator = modCreator[i];
+                Instance.currentModName = modName[i];
+                requestBuilder = $"{modCreator}/{modName}/";
+                modData = getModInfoFromStore(requestBuilder);
+                currentModURL = getModURLFromRequest(modData);
+                if (currentModURL != string.Empty)
+                {
+                    Uri uri = new Uri(currentModURL);
+                    if (uri.Host == "www.thunderstore.io" || uri.Host == "https://thunderstore.io" || uri.Host == "thunderstore.io")
+                    {
+                        mls.LogInfo("It was a thunderstore link so time to download >:)");
+                        // don't need to do anything
+                    }
+                    else
+                    {
+                        mls.LogInfo("ignoring and moving to next mod, bad URL");
+                        continue;
+                    }
+                }
+                myGUI.isMenuOpen = true;
 
-            // if prompt good
-            //downloadFromURLAfterConfirmation(finalModURL, modName);
+                while (!currentModDownloaded)
+                {
+                    StartCoroutine(waitForModDownloads(() => { }, 0.1f));
+                }
+                StartCoroutine(waitForModDownloads(() => { mls.LogInfo("Mod download complete, moving to the next"); }, 0.1f));
+                currentModDownloaded = false;
+                amountOfModsDownloaded += 1;
+                if(amountOfModsDownloaded >= amountOfModsToDownload)
+                {
+                    allModsDownloaded = true;
+                }
+            }
 
-
+           
         }
 
-        internal IEnumerator waitForModDownloads()
+        internal void staticBridgeCoroutineStart(Action action)
         {
-            mls.LogInfo($"Started waiting for mod downloads at: {Time.time}");
-            yield return new WaitForSeconds(10f);
-            mls.LogInfo("Waitin for mod download");
-            mls.LogInfo($"Finished waiting for mod downloads at: {Time.time}");
-            currentModDownloaded = false;
+            StartCoroutine(waitForModDownloads(action, 5f));
+        }
+
+        internal void staticBridgeWaitForModDownloads(float delay)
+        {
+            StartCoroutine(waitForModDownloads(() => { }, delay));
+        }
+
+        internal IEnumerator waitForModDownloads(Action action, float delay)
+        {
+            //mls.LogInfo($"Started waiting for mod downloads at: {Time.time}");
+            yield return new WaitForSeconds(delay);
+            //mls.LogInfo($"Finished waiting for mod downloads at: {Time.time}");
+            action();
         }
 
         internal static void downloadFromURLAfterConfirmation(string modURL, string modName)
@@ -357,12 +370,6 @@ namespace LCModSync
         }
 
         private IEnumerator DelayAction(Action action)
-        {
-            yield return null;
-            action();
-        }
-
-        private static IEnumerator DelayActionStatic(Action action)
         {
             yield return null;
             action();

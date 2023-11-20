@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using UnityEngine;
 
 namespace LCModSync.Patches
 {
@@ -29,19 +30,15 @@ namespace LCModSync.Patches
                     ModSyncPlugin.mls.LogWarning("Host has mods with improper formatting.");
                 }
 
-                for(int i = 0; i < listModCreators.Count; i++)
+                try
                 {
-                    try
-                    {
-                        ModSyncPlugin.Instance.currentModDownloaded = false;
-                        ModSyncPlugin.Instance.waitForModDownloads();
-                        ModSyncPlugin.promptDownloadMod(listModCreators[i], listModNames[i]);
-                    }
-                    catch (Exception e)
-                    {
-                        ModSyncPlugin.mls.LogInfo($"We tried to download {listModNames[i]} but failed. Advise the developer to check the URL or name.");
-                    }
-                    
+                    ModSyncPlugin.Instance.currentModDownloaded = false;
+                    ModSyncPlugin.Instance.staticBridgeCoroutineStart(() => ModSyncPlugin.Instance.promptDownloadMods(listModCreators, listModNames));
+
+                }
+                catch (Exception e)
+                {
+                    //ModSyncPlugin.mls.LogInfo($"We tried to download {listModNames[i]} but failed. Advise the developer to check the URL or name.");
                 }
 
                 ModSyncPlugin.Instance.ReloadPlugins();
@@ -51,7 +48,13 @@ namespace LCModSync.Patches
                 ModSyncPlugin.mls.LogInfo("DO NOT BOOP");
             }
 
-            return false;
+            while (!ModSyncPlugin.Instance.allModsDownloaded)
+            {
+                // 
+                ModSyncPlugin.Instance.staticBridgeCoroutineStart(() => ModSyncPlugin.Instance.staticBridgeWaitForModDownloads(0.1f));
+            }
+
+            return true;
 
         }
     }

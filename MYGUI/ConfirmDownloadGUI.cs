@@ -1,18 +1,10 @@
-﻿using BepInEx.Configuration;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using UnityEngine;
-using UnityEngine.Windows;
-using TMPro;
+﻿using UnityEngine;
 
 namespace LCModSync.MYGUI
 {
     internal class ConfirmDownloadGUI : MonoBehaviour
     {
-        private bool isMenuOpen;
+        public bool isMenuOpen;
         private bool wasKeyDown;
 
         private int MENUWIDTH = 800;
@@ -32,7 +24,7 @@ namespace LCModSync.MYGUI
         private void Awake()
         {
             ModSyncPlugin.mls.LogInfo("Download Confirmation has arrived");
-            isMenuOpen = true;
+            isMenuOpen = false;
             
             MENUWIDTH = Screen.width / 3;
             MENUHEIGHT = Screen.width / 4;
@@ -106,8 +98,15 @@ namespace LCModSync.MYGUI
             {
                 GUI.Box(new Rect(MENUX, MENUY, MENUWIDTH, MENUHEIGHT), "ModSync", menuStyle);
                 GUI.Label(new Rect(CENTERX, MENUY + 100, ITEMWIDTH, 80), $"Would you like to download {ModSyncPlugin.Instance.currentModName} by {ModSyncPlugin.Instance.currentModCreator}?", labelStyle);
-                GUI.Button(new Rect(MENUX + (0.25f * MENUX) - ((ITEMWIDTH / 1.5f) / 2), MENUY + MENUHEIGHT - 150, ITEMWIDTH / 1.5f, 50), "Confirm Download", confirmButtonStyle);
-                GUI.Button(new Rect(MENUX + (0.75f * MENUX) - ((ITEMWIDTH / 1.5f) / 2), MENUY + MENUHEIGHT - 150, ITEMWIDTH / 1.5f, 50), "Decline Download", declineButtonStyle);
+                if(GUI.Button(new Rect(MENUX + (0.25f * MENUX) - ((ITEMWIDTH / 1.5f) / 2), MENUY + MENUHEIGHT - 150, ITEMWIDTH / 1.5f, 50), "Confirm Download", confirmButtonStyle))
+                {
+                    ModSyncPlugin.downloadFromURLAfterConfirmation(ModSyncPlugin.Instance.currentModURL, ModSyncPlugin.Instance.currentModName);
+                }
+
+                if(GUI.Button(new Rect(MENUX + (0.75f * MENUX) - ((ITEMWIDTH / 1.5f) / 2), MENUY + MENUHEIGHT - 150, ITEMWIDTH / 1.5f, 50), "Decline Download", declineButtonStyle))
+                {
+                    ModSyncPlugin.Instance.currentModDownloaded = true;
+                }
             }
         }
     }

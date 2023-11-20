@@ -21,8 +21,8 @@ namespace LCModSync.Patches
         public static void lobbyCreatedPatch(ref Result result, ref Lobby lobby)
         {
             ModSyncPlugin.Instance.currentModDownloaded = false;
-            ModSyncPlugin.Instance.StartCoroutine("waitForModDownloads");
-            ModSyncPlugin.promptDownloadMod("2018", "LC_API");
+            //ModSyncPlugin.Instance.StartCoroutine("waitForModDownloads");
+            //ModSyncPlugin.promptDownloadMod("2018", "LC_API");
             ModSyncPlugin.mls.LogInfo("Lobby created");
             lobby.SetData("TestData", "BOOP");
             lobby.SetData("modNames", String.Join(" ", ModSyncPlugin.modNames));
