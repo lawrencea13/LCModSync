@@ -37,11 +37,11 @@ using Steamworks.Data;
 namespace LCModSync
 {
     [BepInPlugin(modGUID, modName, modVersion)]
-    public class ModSyncPlugin : BaseUnityPlugins
+    public class ModSyncPlugin : BaseUnityPlugin
     {
         private const string modGUID = "Poseidon.ModSync";
         private const string modName = "Lethal Company ModSync";
-        private const string modVersion = "0.1.0";
+        private const string modVersion = "0.1.1";
 
         private readonly Harmony harmony = new Harmony(modGUID);
 
@@ -109,7 +109,7 @@ namespace LCModSync
             {
                 try
                 {
-                    plugin.Value.Instance.BroadcastMessage("sendModInfo", Instance, UnityEngine.SendMessageOptions.DontRequireReceiver);
+                    plugin.Value.Instance.BroadcastMessage("sendModInfo", null, UnityEngine.SendMessageOptions.DontRequireReceiver);
                 }
                 catch (Exception e)
                 {
@@ -124,47 +124,7 @@ namespace LCModSync
 
         static string getModURLFromRequest(string inputData)
         {
-            // old method
-            /*
-            string attribute = "download_url";
-
-            if (!inputData.Contains(attribute))
-            {
-                return "";
-            }
-            int first = inputData.IndexOf(attribute) + attribute.Length;
-
-            List<Char> termsList = new List<Char>();
-            int foundBreaks = 0;
-
-            for (int i = 0; i < 100; i++)
-            {
-                if (inputData[first + i].ToString() == "\"")
-                {
-                    foundBreaks++;
-                }
-                else
-                {
-                    if (foundBreaks == 2)
-                    {
-                        termsList.Add(inputData[first + i]);
-                    }
-                    if (foundBreaks >= 3)
-                    {
-                        break;
-                    }
-                }
-            }
-
-            string finalStr = "";
-
-            foreach (char i in termsList)
-            {
-                finalStr += i.ToString();
-            }
-
-            return finalStr;
-            */
+           
 
             var jsonData = (JObject)JsonConvert.DeserializeObject(inputData);
             var message = jsonData["latest"]["download_url"].Value<string>();
@@ -252,25 +212,34 @@ namespace LCModSync
             
         }
 
-        internal static void downloadFromURLAfterConfirmation(string modURL, string modName)
+        internal static void downloadFromURLAfterConfirmation(string modURL, string modName, bool shouldDownload)
         {
-            using (WebClient wc = new WebClient())
+            if (shouldDownload)
             {
-                wc.DownloadFileCompleted += onDownloadComplete;
-                wc.DownloadProgressChanged += onDownloadProgressChange;
-                wc.DownloadFileAsync(
-                    new System.Uri(modURL),
-                    // name of file, aka where it will go
-                    ".\\Bepinex\\downloads\\" + $"{modName}.zip"
-                );
+                using (WebClient wc = new WebClient())
+                {
+                    wc.DownloadFileCompleted += onDownloadComplete;
+                    wc.DownloadProgressChanged += onDownloadProgressChange;
+                    wc.DownloadFileAsync(
+                        new System.Uri(modURL),
+                        // name of file, aka where it will go
+                        ".\\Bepinex\\downloads\\" + $"{modName}.zip"
+                    );
+                }
+
+                // now that the mod was downloaded, we need to extract it since it is a zip
+
             }
 
-            // now that the mod was downloaded, we need to extract it since it is a zip
             zipPath = Path.GetFullPath(".\\Bepinex\\downloads\\" + $"{modName}.zip");
             outputPath = Path.GetFullPath(".\\Bepinex\\scripts\\");
 
             if (!outputPath.EndsWith(Path.DirectorySeparatorChar.ToString(), StringComparison.Ordinal))
                 outputPath += Path.DirectorySeparatorChar;
+
+
+            Instance.downloadProgress = 0;
+            extractCurrentMod();
 
         }
 
@@ -333,7 +302,7 @@ namespace LCModSync
             currentModNames.RemoveAt(0);
 
             Destroy(Instance.currentGUIObject.gameObject);
-            Instance.currentGUIObject = null;
+            //Instance.currentGUIObject = null;
 
             mls.LogInfo($"finished downloading mod, about to cleanup to progress. You have {currentModNames.Count} mods left to download");
 
@@ -369,15 +338,15 @@ namespace LCModSync
 
         }
 
-        public void getModInfo(string modCreator, string modName)
+        public void getModInfo(List<string> modInfo)
         {
             /* After sending a message to a mod to ask for their information, they should be calling this method
              * Upon calling this method, they should include a string for the URL of the mod, and a string for the name formatted as name.dll
              * nonstatic, can be called from external area
              */
 
-            mls.LogInfo($"We have received {modName}");
-            storeModInfo(modCreator, modName);
+            mls.LogInfo($"We have received {modInfo[1]}");
+            storeModInfo(modInfo[0], modInfo[1]);
         }
 
         private IEnumerable<Type> GetTypesSafe(Assembly ass)

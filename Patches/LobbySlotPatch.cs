@@ -62,11 +62,13 @@ namespace LCModSync.Patches
             {
 
                 // testing
+#if DEBUG
                 listModNames.Add("LC_API");
                 listModCreators.Add("2018");
 
                 listModNames.Add("GameMaster");
                 listModCreators.Add("GameMasterDevs");
+#endif
             }
 
             if (listModCreators.Count != listModNames.Count)

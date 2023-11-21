@@ -99,12 +99,12 @@ namespace LCModSync.MYGUI
             GUI.Label(new Rect(CENTERX, MENUY + 200, ITEMWIDTH, 80), $"{ModSyncPlugin.Instance.downloadProgress}%", labelStyle);
             if (GUI.Button(new Rect(MENUX + (0.25f * MENUX) - ((ITEMWIDTH / 1.5f) / 2), MENUY + MENUHEIGHT - 150, ITEMWIDTH / 1.5f, 50), "Confirm Download", confirmButtonStyle))
             {
-                ModSyncPlugin.downloadFromURLAfterConfirmation(ModSyncPlugin.Instance.currentModURL, ModSyncPlugin.Instance.currentModName);
+                ModSyncPlugin.downloadFromURLAfterConfirmation(ModSyncPlugin.Instance.currentModURL, ModSyncPlugin.Instance.currentModName, true);
             }
 
             if (GUI.Button(new Rect(MENUX + (0.75f * MENUX) - ((ITEMWIDTH / 1.5f) / 2), MENUY + MENUHEIGHT - 150, ITEMWIDTH / 1.5f, 50), "Decline Download", declineButtonStyle))
             {
-                ModSyncPlugin.Instance.currentModDownloaded = true;
+                ModSyncPlugin.downloadFromURLAfterConfirmation(ModSyncPlugin.Instance.currentModURL, ModSyncPlugin.Instance.currentModName, false);
             }
 
             if (ModSyncPlugin.Instance.guiMenuOpen)
