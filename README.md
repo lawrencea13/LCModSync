@@ -10,9 +10,35 @@ Until security measures are in place, all download links to compiled releases ar
 3. Internet :)
 
 # How to implement into your mod
-1. Download and add as a reference
-2. create a public method called "sendModInfo"(case sensitive) add ModSyncPlugin as a parameter
-3. call getModInfo(string modCreator, string modName)(these can be found from your thunderstore listing
+I removed the dependency requirement, now you just send a message back to my plugin when you receive it.
+```cs
+ public void sendModInfo()
+ {
+     foreach (var plugin in Chainloader.PluginInfos)
+     {
+         if (plugin.Value.Metadata.GUID.Contains("ModSync"))
+         {
+             try
+             {
+                 List<string> list = new List<string>
+                 {
+                     "GameMasterDevs",
+                     "GameMaster"
+                 };
+                 plugin.Value.Instance.BroadcastMessage("getModInfo", list, UnityEngine.SendMessageOptions.DontRequireReceiver);
+             }
+             catch (Exception e)
+             {
+                 // ignore mod if error, removing dependency
+                 mls.LogInfo($"Failed to send info to ModSync, go yell at Minx");
+             }
+             break;
+         }
+        
+     }
+ }
+
+```
 
 # Video Tutorial
 https://www.youtube.com/watch?v=Zq8herBrzWI
